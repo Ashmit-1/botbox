@@ -1,0 +1,97 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* GitHub syntax highlighting theme for rehype-highlight */
+/* Dark theme compatible with our brutalist design */
+.hljs {
+  display: block;
+  overflow-x: auto;
+  padding: 0.5em;
+  color: #e6edf3;
+  background: #0d1117 !important;
+}
+
+.hljs-subst,
+.hljs-title,
+.hljs-id,
+.hljs-section,
+.hljs-type {
+  font-weight: bold;
+  color: #ffa657;
+}
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-selector-id,
+.hljs-selector-class,
+.hljs-selector-attr,
+.hljs-selector-pseudo {
+  color: #ff7b72;
+}
+
+.hljs-string,
+.hljs-number,
+.hljs-literal,
+.hljs-template-tag,
+.hljs-template-variable {
+  color: #a5d6ff;
+}
+
+.hljs-comment,
+.hljs-quote {
+  color: #6e7788;
+  font-style: italic;
+}
+
+.hljs-name,
+.hljs-attribute {
+  color: #79c0ff;
+}
+
+.hljs-variable,
+.hljs-meta {
+  color: #79c0ff;
+}
+
+.hljs-function,
+.hljs-class {
+  color: #ffa657;
+}
+
+.hljs-punctuation {
+  color: #8b949e;
+}
+
+.hljs-regexp,
+.hljs-link {
+  color: #a5d6ff;
+}
+
+@layer base {
+  html {
+    @apply bg-black text-white;
+  }
+  
+  body {
+    @apply min-h-screen;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply px-4 py-2 border border-white rounded-md hover:bg-gray-900 focus:outline-none focus:ring-1 focus:ring-white transition-colors;
+  }
+  
+  .btn-primary {
+    @apply px-4 py-2 bg-white text-black border border-white rounded-md hover:bg-gray-200 focus:outline-none focus:ring-1 focus:ring-white transition-colors;
+  }
+  
+  .card {
+    @apply border border-white rounded-md p-4 md:p-6;
+  }
+  
+  .input {
+    @apply w-full px-3 py-2 bg-black border border-white rounded-md focus:outline-none focus:ring-1 focus:ring-white;
+  }
+}
