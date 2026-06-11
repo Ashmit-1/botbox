@@ -395,9 +395,10 @@ export function getTrimOffset(conversation) {
  * @returns {number} - Estimated token count
  */
 export function calculateCurrentContextTokens(conversation) {
-  if (!conversation) return 0;
+  if (!conversation) return null;
 
-  // Prefer actual token count from backend responses — sum up ALL assistant responses
+  // Sum backend-provided total tokens across all assistant responses.
+  // Returns null when no verified backend data exists (no estimation).
   let total = 0;
   let hasBackendData = false;
   for (const message of conversation.messages) {
@@ -406,21 +407,13 @@ export function calculateCurrentContextTokens(conversation) {
       hasBackendData = true;
     }
   }
+
   if (hasBackendData) {
     return total;
   }
 
-  // Fallback: estimate from word count for messages without metadata
-  const { messages, accumulatedTrimBoundary } = conversation;
-  const messagesInContext = messages.slice(accumulatedTrimBoundary);
-  let tokenCount = 0;
-  for (const message of messagesInContext) {
-    if (message.content && message.content.trim()) {
-      const wordCount = message.content.trim().split(/\s+/).length;
-      tokenCount += wordCount * 4;
-    }
-  }
-  return tokenCount;
+  // No verified backend data — return null so callers can show "?"
+  return null;
 }
 
 /**
@@ -430,12 +423,15 @@ export function calculateCurrentContextTokens(conversation) {
  * @returns {number} - Percentage (0-1)
  */
 export function calculateContextUsagePercent(conversation, settings) {
-  if (!conversation || !settings) return 0;
-  
+  if (!conversation || !settings) return null;
+
   const contextWindow = settings.contextWindow || 8000;
-  if (contextWindow <= 0) return 0;
-  
+  if (contextWindow <= 0) return null;
+
   const currentTokens = calculateCurrentContextTokens(conversation);
+  // Unknown token count — cannot compute a meaningful percentage
+  if (currentTokens === null) return null;
+
   return Math.min(1, currentTokens / contextWindow);
 }
 
@@ -448,7 +444,7 @@ export function calculateConversationContextTokens(conversation, settings) {
   const contextWindow = settings?.contextWindow || 8000;
   const currentTokens = calculateCurrentContextTokens(conversation);
   const usagePercent = calculateContextUsagePercent(conversation, settings);
-  
+
   return {
     currentTokens,
     contextWindow,
@@ -465,7 +461,11 @@ export function calculateConversationContextTokens(conversation, settings) {
 export function getContextUsageDisplay(conversation, settings) {
   const contextWindow = settings?.contextWindow || 8000;
   const currentTokens = calculateCurrentContextTokens(conversation);
-  
+
+  if (currentTokens === null) {
+    return `? / ${contextWindow}`;
+  }
+
   return `${Math.round(currentTokens)} / ${contextWindow}`;
 }
 
