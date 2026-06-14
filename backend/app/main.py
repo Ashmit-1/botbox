@@ -9,7 +9,11 @@ from app.core.exceptions import register_exception_handlers
 def create_app() -> FastAPI:
     settings = get_settings()
 
-    app = FastAPI(title="BYOK Chat Backend", version="0.1.0")
+    app = FastAPI(title="BYOK Chat Backend", 
+            version="0.1.0", 
+            docs_url=None, 
+            redoc_url = None
+        )
 
     app.add_middleware(
         CORSMiddleware,
