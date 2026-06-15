@@ -86,16 +86,21 @@ function SettingsPage() {
     }
   };
 
-  // Handle context window change with immediate persistence
+  // Handle context window change while typing — no clamping, just update local state
   const handleContextWindowChange = (e) => {
-    const value = parseInt(e.target.value) || 0;
-    setFormData(prev => ({ ...prev, contextWindow: value }));
-    
-    // Validate and clamp
-    const clamped = clampContextWindow(value);
-    if (clamped !== value) {
-      setFormData(prev => ({ ...prev, contextWindow: clamped }));
+    const value = e.target.value;
+    setFormData(prev => ({ ...prev, contextWindow: value === '' ? '' : parseInt(value, 10) }));
+  };
+
+  // Validate and clamp context window on blur
+  const handleContextWindowBlur = () => {
+    let raw = formData.contextWindow;
+    if (raw === '' || isNaN(parseInt(raw, 10))) {
+      raw = 2000;
     }
+    let value = parseInt(raw, 10);
+    const clamped = clampContextWindow(value);
+    setFormData(prev => ({ ...prev, contextWindow: clamped }));
     debouncedSave(setContextWindow, clamped, isValidContextWindow);
   };
 
@@ -220,7 +225,7 @@ function SettingsPage() {
                   type="number"
                   value={formData.contextWindow}
                   onChange={handleContextWindowChange}
-                  min={2000}
+                  onBlur={handleContextWindowBlur}
                   className="w-48 px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-1 focus:ring-white text-white"
                 />
               </div>
