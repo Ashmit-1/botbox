@@ -2,7 +2,7 @@
 
 A high-performance, local-first LLM chat interface featuring real-time streaming, reasoning (thinking) tokens, and precise context window tracking. 
 
-![Logo](./botbox_logo.png)
+![Logo](./frontend/public/botbox_logo.png)
 
 ## 📌 Project Overview
 
