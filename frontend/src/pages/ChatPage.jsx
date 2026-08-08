@@ -22,37 +22,94 @@ import {
 } from '../services/chatStreamService';
 
 /* ========================================================================
+   Helpers
+   ======================================================================== */
+/*
+ * Recursively extract plain text from a React node tree.
+ * rehype-highlight wraps code in nested <span> elements, so `String(children)`
+ * returns "[object Object]". This walks the tree to get the real text.
+ */
+function extractText(node) {
+  if (node == null || node === false || node === true) return '';
+  if (typeof node === 'string' || typeof node === 'number') return String(node);
+  if (Array.isArray(node)) return node.map(extractText).join('');
+  if (node.props && node.props.children != null) return extractText(node.props.children);
+  return '';
+}
+
+/* ========================================================================
+   Code block with copy — separate component so we can use a ref to the
+   rendered DOM for reliable clipboard text (independent of children shape).
+   ======================================================================== */
+function CodeBlock({ className, children, ...props }) {
+  const codeRef = useRef(null);
+  const [copied, setCopied] = useState(false);
+  const language = /language-([\w-]+)/.exec(className || '')?.[1] || null;
+
+  const handleCopy = async () => {
+    // Prefer the rendered DOM text (accurate regardless of highlight spans).
+    const domText = codeRef.current ? codeRef.current.innerText : null;
+    const text = (domText != null ? domText : extractText(children)).replace(/\n$/, '');
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Clipboard API can fail (permissions, non-secure context) — ignore silently.
+    }
+  };
+
+  return (
+    <div className="relative my-4">
+      <div className="overflow-x-auto border border-gray-700 rounded-lg">
+        {language && (
+          <div className="px-4 py-1.5 text-xs uppercase tracking-wider text-gray-400 border-b border-gray-700 bg-gray-900">
+            {language}
+          </div>
+        )}
+        <pre className="bg-gray-800 p-4 overflow-x-auto text-sm m-0">
+          <code ref={codeRef} className={className} {...props}>
+            {children}
+          </code>
+        </pre>
+      </div>
+      <button
+        type="button"
+        onClick={handleCopy}
+        className="absolute top-2 right-2 px-2 py-1 text-xs bg-gray-700 border border-gray-600 rounded hover:bg-gray-600 focus:outline-none focus:ring-1 focus:ring-white transition-colors flex items-center gap-1"
+        title="Copy code"
+      >
+        <Copy size={14} className="text-white" />
+        {copied && <span className="text-white">Copied</span>}
+      </button>
+    </div>
+  );
+}
+
+/* ========================================================================
    Shared markdown components
    ======================================================================== */
 const markdownComponents = {
   code({ inline, className, children, ...props }) {
-    if (inline) {
+    // Robust fenced-block detection. The `inline` flag from the parser is
+    // unreliable, so we ALSO treat code with a language- class or a trailing
+    // newline as a fenced block.
+    const raw = extractText(children);
+    const isBlock = inline === false || /language-/.test(className || '') || /\n$/.test(raw);
+
+    if (!isBlock) {
+      // Inline `code` — plain styled text, NO copy button.
       return (
         <code className="bg-gray-900 px-1.5 py-0.5 rounded-md text-sm font-mono text-gray-300" {...props}>
           {children}
         </code>
       );
     }
-    const codeContent = String(children).replace(/\n$/, '');
+
     return (
-      <div className="relative my-4">
-        <div className="overflow-x-auto border border-gray-700 rounded-lg">
-          <pre className="bg-gray-800 p-4 overflow-x-auto text-sm m-0">
-            <code className={className} {...props}>
-              {children}
-            </code>
-          </pre>
-        </div>
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            navigator.clipboard.writeText(codeContent);
-          }}
-          className="absolute top-3 right-3 px-2 py-1 text-xs bg-gray-700 border border-gray-600 rounded hover:bg-gray-600 focus:outline-none focus:ring-1 focus:ring-white transition-colors flex items-center gap-1"
-        >
-          <Copy size={14} className="text-white" />
-        </button>
-      </div>
+      <CodeBlock className={className} {...props}>
+        {children}
+      </CodeBlock>
     );
   },
   table({ children }) {
@@ -203,14 +260,12 @@ function ChatPage() {
   const saveSuccessTimeoutRef = useRef(null);
 
   /* ----------------------------------------------------------------------
-     Streaming is accumulated OUTSIDE React state to avoid re-renders.
-     We read from the ref in render for the *single* streaming message.
+     Streaming metadata helpers (thinking text + active message id).
+     Content streams straight into the store; these refs only track
+     assistant "thinking" deltas and the active message id.
      ---------------------------------------------------------------------- */
-  const streamAccRef = useRef('');
   const streamMsgIdRef = useRef(null);
   const streamThinkingRef = useRef('');
-  const streamTickRef = useRef(null);
-  const [streamTick, setStreamTick] = useState(0); // triggers re-render of only the active msg
 
   /* ------- Store hooks ------- */
   const currentConversation = useConversationStore((state) => state.getCurrentConversation());
@@ -271,21 +326,8 @@ function ChatPage() {
      Helpers for streaming lifecycle
      ---------------------------------------------------------------------- */
   const resetStreamState = useCallback(() => {
-    streamAccRef.current = '';
     streamMsgIdRef.current = null;
     streamThinkingRef.current = '';
-    if (streamTickRef.current) {
-      clearTimeout(streamTickRef.current);
-      streamTickRef.current = null;
-    }
-  }, []);
-
-  const scheduleRenderTick = useCallback(() => {
-    if (streamTickRef.current) return;
-    streamTickRef.current = setTimeout(() => {
-      streamTickRef.current = null;
-      setStreamTick((t) => t + 1);
-    }, 80); // ~12 Hz visual refresh — smooth but not wasteful
   }, []);
 
   /* ----------------------------------------------------------------------
@@ -322,7 +364,9 @@ function ChatPage() {
         onToken: (tokenData) => {
           if (tokenData.content) {
             if (typeof tokenData.content === 'string') {
-              streamAccRef.current += tokenData.content;
+              // Write each delta straight into the store so the memoized
+              // markdown re-renders in real time (live streaming).
+              updateLastMessage(tokenData.content);
             } else if (Array.isArray(tokenData.content)) {
               for (const item of tokenData.content) {
                 if (item.type === 'thinking' && item.thinking) {
@@ -330,7 +374,6 @@ function ChatPage() {
                 }
               }
             }
-            scheduleRenderTick();
             scheduleScroll();
           }
         },
@@ -346,7 +389,6 @@ function ChatPage() {
           if (metadata.trim_boundary) updateTrimBoundary(metadata.trim_boundary);
         },
         onError: (errorData) => {
-          updateLastMessage(streamAccRef.current);
           if (streamMsgIdRef.current && streamThinkingRef.current) {
             updateMessage(streamMsgIdRef.current, { thinking: streamThinkingRef.current });
           }
@@ -354,14 +396,12 @@ function ChatPage() {
           errorLastMessage(errorData.message || 'An error occurred');
         },
         onCancelled: () => {
-          updateLastMessage(streamAccRef.current);
           if (streamMsgIdRef.current && streamThinkingRef.current) {
             updateMessage(streamMsgIdRef.current, { thinking: streamThinkingRef.current });
           }
           stopLastMessage();
         },
         onDone: () => {
-          updateLastMessage(streamAccRef.current);
           if (streamMsgIdRef.current && streamThinkingRef.current) {
             updateMessage(streamMsgIdRef.current, { thinking: streamThinkingRef.current });
           }
@@ -375,7 +415,7 @@ function ChatPage() {
     } finally {
       setIsSending(false);
     }
-  }, [inputValue, currentModel, currentConversation, settings, addMessage, addAssistantMessage, updateLastMessage, completeLastMessage, stopLastMessage, errorLastMessage, updateTrimBoundary, resetStreamState, scheduleRenderTick, scheduleScroll]);
+  }, [inputValue, currentModel, currentConversation, settings, addMessage, addAssistantMessage, updateLastMessage, updateMessage, completeLastMessage, stopLastMessage, errorLastMessage, updateTrimBoundary, resetStreamState, scheduleScroll]);
 
   /* ----------------------------------------------------------------------
      handleStop
@@ -422,7 +462,7 @@ function ChatPage() {
         onToken: (tokenData) => {
           if (tokenData.content) {
             if (typeof tokenData.content === 'string') {
-              streamAccRef.current += tokenData.content;
+              updateLastMessage(tokenData.content);
             } else if (Array.isArray(tokenData.content)) {
               for (const item of tokenData.content) {
                 if (item.type === 'thinking' && item.thinking) {
@@ -430,7 +470,6 @@ function ChatPage() {
                 }
               }
             }
-            scheduleRenderTick();
             scheduleScroll();
           }
         },
@@ -446,7 +485,6 @@ function ChatPage() {
           if (metadata.trim_boundary) updateTrimBoundary(metadata.trim_boundary);
         },
         onError: (errorData) => {
-          updateLastMessage(streamAccRef.current);
           if (streamMsgIdRef.current && streamThinkingRef.current) {
             updateMessage(streamMsgIdRef.current, { thinking: streamThinkingRef.current });
           }
@@ -454,14 +492,12 @@ function ChatPage() {
           errorLastMessage(errorData.message || 'An error occurred');
         },
         onCancelled: () => {
-          updateLastMessage(streamAccRef.current);
           if (streamMsgIdRef.current && streamThinkingRef.current) {
             updateMessage(streamMsgIdRef.current, { thinking: streamThinkingRef.current });
           }
           stopLastMessage();
         },
         onDone: () => {
-          updateLastMessage(streamAccRef.current);
           if (streamMsgIdRef.current && streamThinkingRef.current) {
             updateMessage(streamMsgIdRef.current, { thinking: streamThinkingRef.current });
           }
@@ -475,7 +511,7 @@ function ChatPage() {
     } finally {
       setIsSending(false);
     }
-  }, [currentModel, currentConversation, settings, prepareForRegeneration, addAssistantMessage, updateLastMessage, completeLastMessage, stopLastMessage, errorLastMessage, updateTrimBoundary, updateMessage, resetStreamState, scheduleRenderTick, scheduleScroll]);
+  }, [currentModel, currentConversation, settings, prepareForRegeneration, addAssistantMessage, updateLastMessage, updateMessage, completeLastMessage, stopLastMessage, errorLastMessage, updateTrimBoundary, resetStreamState, scheduleScroll]);
 
   /* ----------------------------------------------------------------------
      Input handlers
@@ -535,38 +571,26 @@ function ChatPage() {
      Render helpers for each message
      ---------------------------------------------------------------------- */
   const renderMessageContent = (message) => {
-    // For streaming messages, we render the RAW accumulated text.
-    // This avoids ReactMarkdown from re-parsing a half-finished fence or bold.
-    if (message.id === streamMsgIdRef.current && (message.status === 'streaming' || isStreamActive)) {
-      const raw = streamAccRef.current;
-      const hasThinking = streamThinkingRef.current && streamThinkingRef.current.trim() !== '';
-      if (!raw && !message.content && !hasThinking) {
-        return (
-          <div className="flex items-center gap-3">
-            <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-            <span className="text-gray-400">Generating..</span>
-          </div>
-        );
-      }
+    const hasThinking = message.thinking && message.thinking.trim();
+
+    // Empty assistant placeholder at the very start of streaming.
+    if (message.role === 'assistant' && message.status === 'streaming' && !message.content && !hasThinking) {
       return (
-        <>
-          {hasThinking && <ThinkingSection content={streamThinkingRef.current} isStreaming />}
-          <pre className="whitespace-pre-wrap font-mono text-sm text-gray-200 leading-relaxed">{raw || message.content}</pre>
-        </>
+        <div className="flex items-center gap-3">
+          <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+          <span className="text-gray-400">Generating..</span>
+        </div>
       );
     }
 
-    // For completed messages, use the full ReactMarkdown render.
-    if (message.thinking && message.thinking.trim()) {
-      return (
-        <>
-          <ThinkingSection content={message.thinking} />
-          <MarkdownContent key={message.id} content={message.content} />
-        </>
-      );
-    }
-
-    return <MarkdownContent key={message.id} content={message.content} />;
+    // Store holds the latest content (updated per token), so ReactMarkdown
+    // re-renders live for both streaming and completed messages.
+    return (
+      <>
+        {hasThinking && <ThinkingSection content={message.thinking} isStreaming={message.status === 'streaming'} />}
+        <MarkdownContent key={message.id} content={message.content} />
+      </>
+    );
   };
 
   return (

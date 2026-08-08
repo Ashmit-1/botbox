@@ -2,70 +2,54 @@
 @tailwind components;
 @tailwind utilities;
 
-/* GitHub syntax highlighting theme for rehype-highlight */
-/* Dark theme compatible with our brutalist design */
+/* rehype-highlight base — Brutalist Dark B&W (no colors per design system) */
 .hljs {
   display: block;
   overflow-x: auto;
-  padding: 0.5em;
-  color: #e6edf3;
-  background: #0d1117 !important;
+  color: #d1d5db; /* gray-300 */
+  background: transparent;
 }
 
-.hljs-subst,
-.hljs-title,
-.hljs-id,
-.hljs-section,
-.hljs-type {
-  font-weight: bold;
-  color: #ffa657;
-}
-
+/* All highlight tokens render in grayscale to keep the strict B&W palette */
 .hljs-keyword,
 .hljs-selector-tag,
 .hljs-selector-id,
 .hljs-selector-class,
 .hljs-selector-attr,
-.hljs-selector-pseudo {
-  color: #ff7b72;
+.hljs-selector-pseudo,
+.hljs-title,
+.hljs-id,
+.hljs-section,
+.hljs-type,
+.hljs-function,
+.hljs-class,
+.hljs-subst {
+  color: #ffffff;
+  font-weight: bold;
 }
 
 .hljs-string,
 .hljs-number,
 .hljs-literal,
 .hljs-template-tag,
-.hljs-template-variable {
-  color: #a5d6ff;
+.hljs-template-variable,
+.hljs-regexp,
+.hljs-link,
+.hljs-name,
+.hljs-attribute,
+.hljs-variable,
+.hljs-meta {
+  color: #d1d5db; /* gray-300 */
 }
 
 .hljs-comment,
 .hljs-quote {
-  color: #6e7788;
+  color: #6b7280; /* gray-500 */
   font-style: italic;
 }
 
-.hljs-name,
-.hljs-attribute {
-  color: #79c0ff;
-}
-
-.hljs-variable,
-.hljs-meta {
-  color: #79c0ff;
-}
-
-.hljs-function,
-.hljs-class {
-  color: #ffa657;
-}
-
 .hljs-punctuation {
-  color: #8b949e;
-}
-
-.hljs-regexp,
-.hljs-link {
-  color: #a5d6ff;
+  color: #9ca3af; /* gray-400 */
 }
 
 @layer base {
