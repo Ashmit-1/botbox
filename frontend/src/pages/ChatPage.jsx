@@ -1,7 +1,8 @@
 import { useState, useRef, useCallback, memo, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import rehypeHighlight from 'rehype-highlight';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { Copy, RotateCcw, Save, Plus, Zap } from 'lucide-react';
 import { useConversationStore, useModelStore, useSettingsStore, useUIStore } from '../store';
 import {
@@ -26,8 +27,7 @@ import {
    ======================================================================== */
 /*
  * Recursively extract plain text from a React node tree.
- * rehype-highlight wraps code in nested <span> elements, so `String(children)`
- * returns "[object Object]". This walks the tree to get the real text.
+ * Used by PreBlock to get the raw code string for the copy button.
  */
 function extractText(node) {
   if (node == null || node === false || node === true) return '';
@@ -48,19 +48,18 @@ function extractText(node) {
  * inner `code` renderer stay responsible for inline styling only.
  */
 function PreBlock({ node, children, ...props }) {
-  const codeRef = useRef(null);
   const [copied, setCopied] = useState(false);
 
-  // Pull language from the single child code element's className when present.
-  const child = Array.isArray(children) ? children[0] : children;
-  const className = child?.props?.className || '';
-  const language = /language-([\w-]+)/.exec(className)?.[1] || null;
+  // Extract the language from the className prop (set by react-markdown / remark-rehype).
+  const match = /language-([\w-]+)/.exec(props.className || '');
+  const language = match ? match[1] : null;
+
+  // Extract the raw code text from the <code> children.
+  const codeText = extractText(children).replace(/\n$/, '');
 
   const handleCopy = async () => {
-    const domText = codeRef.current ? codeRef.current.innerText : null;
-    const text = (domText != null ? domText : extractText(children)).replace(/\n$/, '');
     try {
-      await navigator.clipboard.writeText(text);
+      await navigator.clipboard.writeText(codeText);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
@@ -76,13 +75,24 @@ function PreBlock({ node, children, ...props }) {
             {language}
           </div>
         )}
-        <pre
-          ref={codeRef}
-          className="bg-gray-800 p-4 overflow-x-auto text-sm m-0"
+        <SyntaxHighlighter
           {...props}
+          style={vscDarkPlus}
+          language={language}
+          PreTag="div"
+          customStyle={{
+            margin: 0,
+            padding: '1rem',
+            background: '#111827',
+            borderRadius: '0 0 0.5rem 0.5rem',
+            fontSize: '0.875rem',
+            lineHeight: 1.6,
+          }}
+          wrapLines
+          showLineNumbers={false}
         >
-          {children}
-        </pre>
+          {codeText}
+        </SyntaxHighlighter>
       </div>
       <button
         type="button"
@@ -100,16 +110,9 @@ function PreBlock({ node, children, ...props }) {
 const markdownComponents = {
   pre: PreBlock,
   code({ node, className, children, ...props }) {
-    // Inside a fenced block (wrapped by PreBlock) code is multi-line or
-    // carries a language-/hljs class. Inline code does not. Only inline code
-    // gets the chip styling; block code stays transparent so the <pre> shows.
-    const raw = typeof children === 'string' ? children : extractText(children);
-    const isBlockCode = /language-|(^|\s)hljs(\s|$)/.test(className || '') || /\n/.test(raw);
-    const cls = isBlockCode
-      ? `${className || ''} block font-mono bg-transparent p-0`.trim()
-      : 'bg-gray-900 px-1.5 py-0.5 rounded-md text-sm font-mono text-gray-300';
+    // Inline code only — block code is fully handled by PreBlock + SyntaxHighlighter.
     return (
-      <code className={cls} {...props}>
+      <code className="bg-gray-900 px-1.5 py-0.5 rounded-md text-sm font-mono text-gray-300" {...props}>
         {children}
       </code>
     );
@@ -152,7 +155,6 @@ const MarkdownContent = memo(function MarkdownContent({ content }) {
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm]}
-      rehypePlugins={[rehypeHighlight]}
       components={markdownComponents}
     >
       {content}

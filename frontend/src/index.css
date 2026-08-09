@@ -2,56 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-/* rehype-highlight base — Brutalist Dark B&W (no colors per design system) */
-.hljs {
-  display: block;
-  overflow-x: auto;
-  color: #ffffff;
-  background: transparent; /* container (PreBlock) supplies the surface */
-}
-
-/* Grayscale tokens, with maximum contrast inside a dark block */
-.hljs-keyword,
-.hljs-selector-tag,
-.hljs-selector-id,
-.hljs-selector-class,
-.hljs-selector-attr,
-.hljs-selector-pseudo,
-.hljs-title,
-.hljs-id,
-.hljs-section,
-.hljs-type,
-.hljs-function,
-.hljs-class,
-.hljs-subst {
-  color: #ffffff;
-  font-weight: bold;
-}
-
-.hljs-string,
-.hljs-number,
-.hljs-literal,
-.hljs-template-tag,
-.hljs-template-variable,
-.hljs-regexp,
-.hljs-link,
-.hljs-name,
-.hljs-attribute,
-.hljs-variable,
-.hljs-meta {
-  color: #e5e7eb; /* gray-200 */
-}
-
-.hljs-comment,
-.hljs-quote {
-  color: #9ca3af; /* gray-400 */
-  font-style: italic;
-}
-
-.hljs-punctuation {
-  color: #d1d5db; /* gray-300 */
-}
-
 @layer base {
   html {
     @apply bg-black text-white;
