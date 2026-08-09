@@ -50,8 +50,11 @@ function extractText(node) {
 function PreBlock({ node, children, ...props }) {
   const [copied, setCopied] = useState(false);
 
-  // Extract the language from the className prop (set by react-markdown / remark-rehype).
-  const match = /language-([\w-]+)/.exec(props.className || '');
+  // remark-rehype puts the language class on the <code> child, NOT on <pre>.
+  // Extract the language from the child code element's className.
+  const child = Array.isArray(children) ? children[0] : children;
+  const childClassName = child?.props?.className || '';
+  const match = /language-([\w-]+)/.exec(childClassName);
   const language = match ? match[1] : null;
 
   // Extract the raw code text from the <code> children.
@@ -76,7 +79,6 @@ function PreBlock({ node, children, ...props }) {
           </div>
         )}
         <SyntaxHighlighter
-          {...props}
           style={vscDarkPlus}
           language={language}
           PreTag="div"
