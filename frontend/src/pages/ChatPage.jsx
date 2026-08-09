@@ -41,13 +41,22 @@ function extractText(node) {
    Code block with copy — separate component so we can use a ref to the
    rendered DOM for reliable clipboard text (independent of children shape).
    ======================================================================== */
-function CodeBlock({ className, children, ...props }) {
+/*
+ * Pre override: the only entry point for fenced code blocks after
+ * react-markdown v10 removed the `inline` prop for code components.
+ * `pre` always wraps block code, so we style the block here and let the
+ * inner `code` renderer stay responsible for inline styling only.
+ */
+function PreBlock({ node, children, ...props }) {
   const codeRef = useRef(null);
   const [copied, setCopied] = useState(false);
-  const language = /language-([\w-]+)/.exec(className || '')?.[1] || null;
+
+  // Pull language from the single child code element's className when present.
+  const child = Array.isArray(children) ? children[0] : children;
+  const className = child?.props?.className || '';
+  const language = /language-([\w-]+)/.exec(className)?.[1] || null;
 
   const handleCopy = async () => {
-    // Prefer the rendered DOM text (accurate regardless of highlight spans).
     const domText = codeRef.current ? codeRef.current.innerText : null;
     const text = (domText != null ? domText : extractText(children)).replace(/\n$/, '');
     try {
@@ -55,7 +64,7 @@ function CodeBlock({ className, children, ...props }) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
-      // Clipboard API can fail (permissions, non-secure context) — ignore silently.
+      // Clipboard may fail (permissions, insecure context). Ignore silently.
     }
   };
 
@@ -67,10 +76,12 @@ function CodeBlock({ className, children, ...props }) {
             {language}
           </div>
         )}
-        <pre className="bg-gray-800 p-4 overflow-x-auto text-sm m-0">
-          <code ref={codeRef} className={className} {...props}>
-            {children}
-          </code>
+        <pre
+          ref={codeRef}
+          className="bg-gray-800 p-4 overflow-x-auto text-sm m-0"
+          {...props}
+        >
+          {children}
         </pre>
       </div>
       <button
@@ -86,30 +97,21 @@ function CodeBlock({ className, children, ...props }) {
   );
 }
 
-/* ========================================================================
-   Shared markdown components
-   ======================================================================== */
 const markdownComponents = {
-  code({ inline, className, children, ...props }) {
-    // Robust fenced-block detection. The `inline` flag from the parser is
-    // unreliable, so we ALSO treat code with a language- class or a trailing
-    // newline as a fenced block.
-    const raw = extractText(children);
-    const isBlock = inline === false || /language-/.test(className || '') || /\n$/.test(raw);
-
-    if (!isBlock) {
-      // Inline `code` — plain styled text, NO copy button.
-      return (
-        <code className="bg-gray-900 px-1.5 py-0.5 rounded-md text-sm font-mono text-gray-300" {...props}>
-          {children}
-        </code>
-      );
-    }
-
+  pre: PreBlock,
+  code({ node, className, children, ...props }) {
+    // Inside a fenced block (wrapped by PreBlock) code is multi-line or
+    // carries a language-/hljs class. Inline code does not. Only inline code
+    // gets the chip styling; block code stays transparent so the <pre> shows.
+    const raw = typeof children === 'string' ? children : extractText(children);
+    const isBlockCode = /language-|(^|\s)hljs(\s|$)/.test(className || '') || /\n/.test(raw);
+    const cls = isBlockCode
+      ? `${className || ''} block font-mono bg-transparent p-0`.trim()
+      : 'bg-gray-900 px-1.5 py-0.5 rounded-md text-sm font-mono text-gray-300';
     return (
-      <CodeBlock className={className} {...props}>
+      <code className={cls} {...props}>
         {children}
-      </CodeBlock>
+      </code>
     );
   },
   table({ children }) {

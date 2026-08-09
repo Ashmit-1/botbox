@@ -6,11 +6,11 @@
 .hljs {
   display: block;
   overflow-x: auto;
-  color: #d1d5db; /* gray-300 */
-  background: transparent;
+  color: #ffffff;
+  background: transparent; /* container (PreBlock) supplies the surface */
 }
 
-/* All highlight tokens render in grayscale to keep the strict B&W palette */
+/* Grayscale tokens, with maximum contrast inside a dark block */
 .hljs-keyword,
 .hljs-selector-tag,
 .hljs-selector-id,
@@ -39,17 +39,17 @@
 .hljs-attribute,
 .hljs-variable,
 .hljs-meta {
-  color: #d1d5db; /* gray-300 */
+  color: #e5e7eb; /* gray-200 */
 }
 
 .hljs-comment,
 .hljs-quote {
-  color: #6b7280; /* gray-500 */
+  color: #9ca3af; /* gray-400 */
   font-style: italic;
 }
 
 .hljs-punctuation {
-  color: #9ca3af; /* gray-400 */
+  color: #d1d5db; /* gray-300 */
 }
 
 @layer base {
