@@ -1,10 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Edit2 } from 'lucide-react';
 import { useConversationStore, useModelStore, useUIStore, useSettingsStore } from '../store';
 
 function Sidebar() {
   const [drawerOpen, setDrawerOpen] = useState(false);
+
+  // Rename modal state
+  const [renameConversationId, setRenameConversationId] = useState(null);
+  const [renameTitle, setRenameTitle] = useState('');
+  const renameInputRef = useRef(null);
 
   const sidebarCollapsed = useUIStore((state) => state.isSidebarCollapsed());
   const toggleSidebar = useUIStore((state) => state.actions.toggleSidebar);
@@ -14,6 +19,7 @@ function Sidebar() {
   const createConversation = useConversationStore((state) => state.actions.createConversation);
   const clearCurrentConversation = useConversationStore((state) => state.actions.clearCurrentConversation);
   const saveCurrentConversation = useConversationStore((state) => state.actions.saveCurrentConversation);
+  const renameSavedConversation = useConversationStore((state) => state.actions.renameSavedConversation);
   const deleteSavedConversation = useConversationStore((state) => state.actions.deleteSavedConversation);
 
   const currentModel = useModelStore((state) => {
@@ -62,6 +68,30 @@ function Sidebar() {
   const handleDeleteConversation = async (e, id) => {
     e.stopPropagation();
     await deleteSavedConversation(id);
+  };
+
+  /* ------------------------------------------------------------------
+     Rename
+     ------------------------------------------------------------------ */
+  const openRenameModal = (conversation) => {
+    setRenameConversationId(conversation.id);
+    setRenameTitle(conversation.title);
+  };
+
+  const closeRenameModal = () => {
+    setRenameConversationId(null);
+    setRenameTitle('');
+  };
+
+  const handleRenameSubmit = async () => {
+    if (!renameConversationId || !renameTitle.trim()) return;
+    await renameSavedConversation(renameConversationId, renameTitle.trim());
+    closeRenameModal();
+  };
+
+  const handleRenameKeyDown = (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); handleRenameSubmit(); }
+    if (e.key === 'Escape') closeRenameModal();
   };
 
   const handleLoadConversation = (id) => {
@@ -206,6 +236,13 @@ function Sidebar() {
                       >
                         <Trash2 size={14} />
                       </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); openRenameModal(conversation); }}
+                        className="p-2 rounded-lg hover:bg-gray-900 text-gray-500 hover:text-white focus:outline-none focus:ring-1 focus:ring-white opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Rename conversation"
+                      >
+                        <Edit2 size={14} />
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -293,6 +330,39 @@ function Sidebar() {
                 className="px-4 py-2 bg-white text-black rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-1 focus:ring-white transition-colors uppercase text-sm font-medium"
               >
                 Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rename Conversation Modal */}
+      {renameConversationId && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 p-4">
+          <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 max-w-sm w-full">
+            <h2 className="text-lg font-bold mb-4 uppercase tracking-wider">Rename Conversation</h2>
+            <input
+              ref={renameInputRef}
+              type="text"
+              value={renameTitle}
+              onChange={(e) => setRenameTitle(e.target.value)}
+              onKeyDown={handleRenameKeyDown}
+              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-1 focus:ring-white text-white mb-6 truncate"
+              placeholder="Enter new title..."
+              autoFocus
+            />
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={closeRenameModal}
+                className="px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg hover:bg-gray-700 focus:outline-none focus:ring-1 focus:ring-white transition-colors uppercase text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleRenameSubmit}
+                className="px-4 py-2 bg-white text-black rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-1 focus:ring-white transition-colors uppercase text-sm font-medium"
+              >
+                Rename
               </button>
             </div>
           </div>
