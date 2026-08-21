@@ -356,6 +356,41 @@ const conversationStore = create((set, get) => ({
     },
 
     /**
+     * Rename a saved conversation and persist the change.
+     *
+     * @param {string} id - Saved conversation ID to rename
+     * @param {string} title - New title
+     */
+    renameSavedConversation: async (id, title) => {
+      const { currentConversation, savedConversations } = get();
+
+      const newSavedConversations = savedConversations.map(c =>
+        c.id === id
+          ? { ...c, title, updatedAt: Date.now() }
+          : c
+      );
+
+      // If the current conversation matches this saved ID, mark it dirty
+      if (currentConversation?.id === id) {
+        set({
+          currentConversation: {
+            ...currentConversation,
+            saved: false,
+            title,
+            updatedAt: Date.now(),
+          },
+        });
+      }
+
+      // Persist to localForage
+      await saveConversations(newSavedConversations);
+
+      set({
+        savedConversations: newSavedConversations,
+      });
+    },
+
+    /**
      * Delete a saved conversation and persist the change.
      *
      * @param {string} id - Conversation ID to delete
