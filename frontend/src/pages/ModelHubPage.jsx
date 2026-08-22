@@ -5,7 +5,6 @@ import { PROVIDERS, REQUIRES_BASE_URL } from '../store/modelStore';
 import { createModel } from '../store/schemas';
 import { saveModels } from '../services/persistence';
 import { validateModel } from '../services/api';
-import { loadAllState } from '../services/persistence';
 
 const PROVIDER_DISPLAY = {
   [PROVIDERS.OPENAI]: 'OpenAI',
@@ -55,20 +54,6 @@ function ModelHubPage() {
   const [validationStates, setValidationStates] = useState({});
   const [isValidating, setIsValidating] = useState(false);
   const [validationResult, setValidationResult] = useState(null);
-
-  useEffect(() => {
-    const loadModels = async () => {
-      try {
-        const { models } = await loadAllState();
-        if (models && models.length > 0) {
-          useModelStore.getState().replaceModels(models);
-        }
-      } catch (error) {
-        console.error('Failed to load models:', error);
-      }
-    };
-    loadModels();
-  }, []);
 
   useEffect(() => {
     if (!isAddModalOpen) {
